@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trailer Load Status</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://iojnmzelvclocuignvmo.supabase.co/storage/v1/object/public/scripts/supabase-js.js"></script>
+</head>
+<body class="bg-slate-900 text-white min-h-screen flex items-center justify-center p-6">
+
+    <div id="app" class="max-w-md w-full text-center">
+        <h1 id="display-id" class="text-3xl font-bold mb-6 text-slate-400">Loading...</h1>
+
+        <div id="status-card" class="hidden py-16 rounded-3xl mb-6 transition-all duration-300">
+            <div id="status-icon" class="text-7xl mb-4"></div>
+            <div id="status-text" class="text-4xl font-black uppercase"></div>
+        </div>
+
+        <div id="admin-box" class="hidden space-y-3">
+            <button onclick="setStatus(true)" class="w-full bg-emerald-600 hover:bg-emerald-500 p-5 rounded-2xl font-bold text-xl">✅ MARK LOADED</button>
+            <button onclick="setStatus(false)" class="w-full bg-rose-600 hover:bg-rose-500 p-5 rounded-2xl font-bold text-xl">⏳ MARK LOADING</button>
+        </div>
+
+        <div id="checkin-box" class="hidden bg-slate-800 p-8 rounded-3xl border border-slate-700">
+            <p class="mb-4 text-slate-300">This trailer isn't in the system yet.</p>
+            <button onclick="registerTrailer()" class="w-full bg-blue-600 p-5 rounded-2xl font-bold text-xl">REGISTER TRAILER</button>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = https://hqtobtpjxjgfrntxxyra.supabase.co;
+        const SUPABASE_KEY = sb_publishable_DkOS1m4J5JINRygopTjxzw_CswuJyiL;
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        const params = new URLSearchParams(window.location.search);
+        const trailerId = params.get('t');
+        const isAdmin = params.get('mode') === 'dispatch';
+
+        if (!trailerId) {
+            document.getElementById('display-id').innerText = "Error: No Trailer ID";
+        } else {
+            document.getElementById('display-id').innerText = Trailer: ${trailerId};
+            init();
+        }
+
+        async function init() {
+            let { data } = await supabase.from('trailers').select('*').eq('trailer_id', trailerId).single();
+            
+            if (!data) {
+                document.getElementById('checkin-box').classList.remove('hidden');
+            } else {
+                showStatus(data.is_ready);
+                subscribe();
+            }
+        }
+
+        function showStatus(isReady) {
+            const card = document.getElementById('status-card');
+            card.classList.remove('hidden');
+            if (isAdmin) document.getElementById('admin-box').classList.remove('hidden');
+
+            if (isReady) {
+                card.className = "py-16 rounded-3xl mb-6 bg-emerald-600 shadow-2xl";
+                document.getElementById('status-text').innerText = "READY FOR PICKUP";
+                document.getElementById('status-icon').innerText = "🚚";
+            } else {
+                card.className = "py-16 rounded-3xl mb-6 bg-amber-600 animate-pulse";
+                document.getElementById('status-text').innerText = "LOADING...";
+                document.getElementById('status-icon').innerText = "📦";
+            }
+        }
+
+        async function registerTrailer() {
+            await supabase.from('trailers').insert([{ trailer_id: trailerId, is_ready: false }]);
+            location.reload();
+        }
+
+        async function setStatus(val) {
+            await supabase.from('trailers').update({ is_ready: val }).eq('trailer_id', trailerId);
+        }
+
+        function subscribe() {
+            supabase.channel('changes').on('postgres_changes', 
+                { event: 'UPDATE', schema: 'public', table: 'trailers', filter: trailer_id=eq.${trailerId} }, 
+                payload => showStatus(payload.new.is_ready)
+            ).subscribe();
+        }
+    </script>
+</body>
+</html>

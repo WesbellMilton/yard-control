@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dispatcher Command Center</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://iojnmzelvclocuignvmo.supabase.co/storage/v1/object/public/scripts/supabase-js.js"></script>
+</head>
+<body class="bg-slate-900 text-white p-6">
+    <div class="max-w-4xl mx-auto">
+        <header class="flex justify-between items-center mb-8 border-b border-slate-700 pb-6">
+            <h1 class="text-3xl font-black tracking-tight">YARD CONTROL</h1>
+            <span class="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full text-sm font-mono animate-pulse">LIVE FEED</span>
+        </header>
+
+        <div id="trailer-list" class="grid gap-4">
+            </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = https://hqtobtpjxjgfrntxxyra.supabase.co;
+        const SUPABASE_KEY = sb_publishable_DkOS1m4J5JINRygopTjxzw_CswuJyiL;
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        async function loadTrailers() {
+            const { data } = await supabase.from('trailers').select('*').order('trailer_id');
+            const container = document.getElementById('trailer-list');
+            container.innerHTML = '';
+
+            data.forEach(trailer => {
+                const card = document.createElement('div');
+                card.className = flex items-center justify-between p-6 rounded-2xl border ${trailer.is_ready ? 'border-emerald-500 bg-emerald-950/20' : 'border-slate-700 bg-slate-800'};
+                
+                card.innerHTML = `
+                    <div>
+                        <div class="text-sm text-slate-400 uppercase font-bold">Trailer ID</div>
+                        <div class="text-2xl font-mono">${trailer.trailer_id}</div>
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <span class="font-bold ${trailer.is_ready ? 'text-emerald-400' : 'text-amber-400'}">
+                            ${trailer.is_ready ? 'READY' : 'LOADING'}
+                        </span>
+                        <button onclick="toggleStatus('${trailer.trailer_id}', ${!trailer.is_ready})" 
+                                class="px-6 py-3 rounded-xl font-bold bg-slate-700 hover:bg-slate-600 transition">
+                            CHANGE
+                        </button>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        async function toggleStatus(id, newStatus) {
+            await supabase.from('trailers').update({ is_ready: newStatus }).eq('trailer_id', id);
+            loadTrailers(); // Refresh list
+        }
+
+        // Subscribe to real-time updates so the list refreshes if a driver registers
+        supabase.channel('custom-all-channel')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'trailers' }, () => loadTrailers())
+          .subscribe();
+
+        loadTrailers();
+    </script>
+</body>
+</html>
