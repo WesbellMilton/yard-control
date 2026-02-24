@@ -10,8 +10,13 @@
 <body class="bg-slate-900 text-white p-6">
     <div class="max-w-4xl mx-auto">
         <header class="flex justify-between items-center mb-8 border-b border-slate-700 pb-6">
-            <h1 class="text-3xl font-black tracking-tight">YARD CONTROL</h1>
-            <span class="bg-emerald-500/20 text-emerald-400 px-3 py-1 rounded-full text-sm font-mono animate-pulse">LIVE FEED</span>
+            <div>
+                <h1 class="text-3xl font-black tracking-tight text-white">YARD CONTROL</h1>
+                <p class="text-slate-400 text-sm">Manage incoming and outgoing trailers</p>
+            </div>
+            <button onclick="clearAll()" class="text-xs bg-rose-900/30 text-rose-400 border border-rose-800 px-3 py-2 rounded-lg hover:bg-rose-800 hover:text-white transition">
+                CLEAR ENTIRE YARD
+            </button>
         </header>
 
         <div id="trailer-list" class="grid gap-4">
@@ -28,22 +33,32 @@
             const container = document.getElementById('trailer-list');
             container.innerHTML = '';
 
+            if (data.length === 0) {
+                container.innerHTML = '<div class="text-center py-20 text-slate-500 border-2 border-dashed border-slate-800 rounded-3xl">No trailers currently checked in.</div>';
+            }
+
             data.forEach(trailer => {
                 const card = document.createElement('div');
-                card.className = flex items-center justify-between p-6 rounded-2xl border ${trailer.is_ready ? 'border-emerald-500 bg-emerald-950/20' : 'border-slate-700 bg-slate-800'};
+                card.className = flex items-center justify-between p-4 rounded-2xl border ${trailer.is_ready ? 'border-emerald-500 bg-emerald-950/20' : 'border-slate-700 bg-slate-800'};
                 
                 card.innerHTML = `
-                    <div>
-                        <div class="text-sm text-slate-400 uppercase font-bold">Trailer ID</div>
-                        <div class="text-2xl font-mono">${trailer.trailer_id}</div>
-                    </div>
                     <div class="flex items-center gap-4">
-                        <span class="font-bold ${trailer.is_ready ? 'text-emerald-400' : 'text-amber-400'}">
+                        <button onclick="deleteTrailer('${trailer.trailer_id}')" class="bg-slate-700 hover:bg-rose-600 p-2 rounded-lg transition" title="Delete">
+                            🗑️
+                        </button>
+                        <div>
+                            <div class="text-xs text-slate-400 uppercase font-bold leading-none">Trailer</div>
+                            <div class="text-xl font-mono">${trailer.trailer_id}</div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex items-center gap-3">
+                        <span class="text-sm font-bold ${trailer.is_ready ? 'text-emerald-400' : 'text-amber-400'}">
                             ${trailer.is_ready ? 'READY' : 'LOADING'}
                         </span>
                         <button onclick="toggleStatus('${trailer.trailer_id}', ${!trailer.is_ready})" 
-                                class="px-6 py-3 rounded-xl font-bold bg-slate-700 hover:bg-slate-600 transition">
-                            CHANGE
+                                class="px-4 py-2 rounded-xl font-bold bg-white text-slate-900 hover:bg-slate-200 transition text-sm">
+                            TOGGLE
                         </button>
                     </div>
                 `;
@@ -53,10 +68,26 @@
 
         async function toggleStatus(id, newStatus) {
             await supabase.from('trailers').update({ is_ready: newStatus }).eq('trailer_id', id);
-            loadTrailers(); // Refresh list
+            loadTrailers();
         }
 
-        // Subscribe to real-time updates so the list refreshes if a driver registers
+        async function deleteTrailer(id) {
+            if(confirm(Remove Trailer ${id} from the list?)) {
+                await supabase.from('trailers').delete().eq('trailer_id', id);
+                loadTrailers();
+            }
+        }
+
+        async function clearAll() {
+            if(confirm("Are you sure? This will remove ALL trailers from the dashboard.")) {
+                const { data } = await supabase.from('trailers').select('trailer_id');
+                for (let t of data) {
+                    await supabase.from('trailers').delete().eq('trailer_id', t.trailer_id);
+                }
+                loadTrailers();
+            }
+        }
+
         supabase.channel('custom-all-channel')
           .on('postgres_changes', { event: '*', schema: 'public', table: 'trailers' }, () => loadTrailers())
           .subscribe();
